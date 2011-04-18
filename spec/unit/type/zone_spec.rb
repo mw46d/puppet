@@ -57,4 +57,8 @@ describe zone do
     zone.new(:name => "dummy", :path => "/dummy", :ip => "if", :iptype => :exclusive)
   end
 
+  it "should be invalid when :ip is an empty string" do
+    lambda { zone.new(:name => "dummy", :ip => "" )  }.should raise_error
+  end
+
 end

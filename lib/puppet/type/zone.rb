@@ -205,8 +205,9 @@ Puppet::Type.newtype(:zone) do
   newproperty(:ip, :parent => ZoneMultiConfigProperty) do
     require 'ipaddr'
 
-    desc "The IP address of the zone.  IP addresses must be specified
-      with the interface, separated by a colon, e.g.: bge0:192.168.0.1.
+    desc "The IP address information for the zone.  IP addresses must be specified
+      with the interface, separated by a colon, e.g.: bge0:192.168.0.1. And the
+      optional default gateway IP can be specified too. e.g.: eri2:10.0.0.12:10.0.0.1
       For multiple interfaces, specify them in an array."
 
     # Add an interface.
@@ -243,7 +244,8 @@ Puppet::Type.newtype(:zone) do
   end
 
   newproperty(:iptype, :parent => ZoneConfigProperty) do
-    desc "The IP stack type of the zone. Can either be 'shared' or 'exclusive'."
+    desc "The IP stack type of the zone. Can either be 'shared' or 'exclusive'.
+          Defaults to 'shared'."
 
     defaultto :shared
 
@@ -395,19 +397,27 @@ Puppet::Type.newtype(:zone) do
   end
 
   validate do
+
+    Puppet.notice "Ensure is #{provider.properties[:ensure]}"
+
     value = self[:ip]
-    interface, address, defrouter = value.split(':')
-    if self[:iptype] == :shared
-      if (interface && address && defrouter.nil?) ||
-        (interface && address && defrouter)
-        validate_ip(address, "IP address")
-        validate_ip(defrouter, "default router")
+
+    # :ip can be blank for a number of valid reasons, so we should not assume we
+    # must have it. (removing zones by name, zones that require no IP networking).
+    unless value.nil?
+      interface, address, defrouter = value.split(':')
+      if self[:iptype] == :shared
+        if (interface && address && defrouter.nil?) ||
+          (interface && address && defrouter)
+          validate_ip(address, "IP address")
+          validate_ip(defrouter, "default router")
+        else
+          self.fail "ip must contain interface name and ip address separated by a \":\""
+        end
       else
-        self.fail "ip must contain interface name and ip address separated by a \":\""
+        self.fail "only interface may be specified when using exclusive IP stack: #{value}" unless interface && address.nil? && defrouter.nil?
       end
-    else
-      self.fail "only interface may be specified when using exclusive IP stack: #{value}" unless interface && address.nil? && defrouter.nil?
-    end
+    end # unless value.nil?
 
     self.fail "zone path is required" unless self[:path]
   end
@@ -443,4 +453,5 @@ Puppet::Type.newtype(:zone) do
     end
     prophash
   end
+
 end
